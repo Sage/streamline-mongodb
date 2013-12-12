@@ -2,10 +2,32 @@ var mongodb = require('mongodb');
 
 exports = module.exports = Object.create(mongodb);
 
+var generic;
+
+exports.reader = function(cursor) {
+	generic = generic || require('streamline-streams/lib/devices/generic');
+	return generic.reader(function(_) {
+		var obj = cursor.nextObject(_);
+		return obj == null ? undefined : obj;
+	});
+}
+exports.writer = function(collection) {
+	generic = generic || require('streamline-streams/lib/devices/generic');
+	var done;
+	return generic.writer(function(_, val) {
+		if (val === undefined) done = true;
+		if (!done) collection.insert(val, _);
+	});
+}
+
 // We only need the wrapper if running with a fast option. So test and bail out here
 if (!/-fast$/.test(require('streamline/lib/globals').runtime)) return;
 
-exports = module.exports = {};
+exports = module.exports = {
+	reader: exports.reader,
+	writer: exports.writer,
+};
+
 exports.Server = mongodb.Server;
 
 exports.Db = function Db(databaseName, serverConfig, options) {
@@ -26,6 +48,10 @@ dbProto.count = function(name, _) {
 };
 dbProto.dropDatabase = function(_) {
 	this.obj.dropDatabase(~_);
+	return this;
+};
+dbProto.dropCollection = function(name, _) {
+	this.obj.dropCollection(name, ~_);
 	return this;
 };
 dbProto.close = function() {
@@ -91,6 +117,10 @@ colProto.ensureIndex = function(fieldOrSpec, options, _) {
 	if (typeof options === "function") return this.obj.ensureIndex(fieldOrSpec, ~_);
 	else return this.obj.ensureIndex(fieldOrSpec, options, ~_);
 };
+colProto.indexInformation = function(options, _) {
+	if (typeof options === "function") return this.obj.indexInformation( ~_);
+	else return this.obj.indexInformation(options, ~_);
+};
 colProto.drop = function(_) {
 	return this.obj.drop(~_);
 };
@@ -124,11 +154,16 @@ curProto.nextObject = function(_) {
 	return this.obj.nextObject(~_);
 };
 
+curProto.sort = function(criteria) {
+	this.obj.sort(criteria);
+	return this;
+};
+
 exports.GridStore = function GridStore(db, path, flags) {
 	if(!(this instanceof GridStore)) return new GridStore(db, path, flags);
 	mongodb.GridStore.call(this, db.obj, path, flags);
 };
-exports.GridStore.prototype = new mongodb.GridStore();
+exports.GridStore.prototype = Object.create(mongodb.GridStore.prototype);
 var gridStoreProto = exports.GridStore.prototype;
 exports.GridStore.exist = function(db, path, _) {
 	return mongodb.GridStore.exist(db.obj, path, ~_);
