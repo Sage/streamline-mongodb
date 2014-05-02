@@ -5,14 +5,14 @@ exports = module.exports = Object.create(mongodb);
 var generic;
 
 exports.reader = function(cursor) {
-	generic = generic || require('streamline-streams/lib/devices/generic');
+	generic = generic || require("ez-streams").devices.generic;
 	return generic.reader(function(_) {
 		var obj = cursor.nextObject(_);
 		return obj == null ? undefined : obj;
 	});
 }
 exports.writer = function(collection) {
-	generic = generic || require('streamline-streams/lib/devices/generic');
+	generic = generic || require("ez-streams").devices.generic;
 	var done;
 	return generic.writer(function(_, val) {
 		if (val === undefined) done = true;
@@ -81,6 +81,9 @@ dbProto.eval = function(code, parameters, options, _) {
 		}
 	});
 });
+dbProto.collectionNames = function(_) {
+	return this.obj.collectionNames(~_);
+};
 
 function Collection(obj) {
 	this.obj = obj;
@@ -139,6 +142,10 @@ colProto.find = function() {
 	} else {
 		return new Cursor(this.obj.find.apply(this.obj, arguments));
 	}
+};
+colProto.findAndModify = function(selector, sort, doc, options, _) {
+	if (typeof options === "function") return this.obj.findAndModify(selector, sort, doc, ~_);
+	else return this.obj.findAndModify(selector, sort, doc, options, ~_);
 };
 
 function Cursor(obj) {
